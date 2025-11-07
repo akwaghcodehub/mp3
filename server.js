@@ -1,22 +1,35 @@
-// Get the packages we need
 var express = require('express'),
     router = express.Router(),
     mongoose = require('mongoose'),
     bodyParser = require('body-parser');
 
-// Read .env file
 require('dotenv').config();
 
-// Create our Express application
 var app = express();
 
-// Use environment defined port or 3000
 var port = process.env.PORT || 3000;
 
-// Connect to a MongoDB --> Uncomment this once you have a connection string!!
-//mongoose.connect(process.env.MONGODB_URI,  { useNewUrlParser: true });
+if (!process.env.MONGODB_URI) {
+    console.error('ERROR: MONGODB_URI is not defined in .env file');
+    console.error('Please create a .env file with your MongoDB Atlas connection string');
+    process.exit(1);
+}
 
-// Allow CORS so that backend and frontend could be put on different servers
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+
+mongoose.connection.on('connected', function () {
+    console.log('MongoDB connected successfully');
+});
+
+mongoose.connection.on('error', function (err) {
+    console.error('MongoDB connection error:', err);
+    console.error('Please check your MONGODB_URI in .env file');
+});
+
+mongoose.connection.on('disconnected', function () {
+    console.log('MongoDB disconnected');
+});
+
 var allowCrossDomain = function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept");
@@ -25,15 +38,21 @@ var allowCrossDomain = function (req, res, next) {
 };
 app.use(allowCrossDomain);
 
-// Use the body-parser package in our application
 app.use(bodyParser.urlencoded({
     extended: true
 }));
 app.use(bodyParser.json());
 
-// Use routes as a module (see index.js)
 require('./routes')(app, router);
 
-// Start the server
-app.listen(port);
-console.log('Server running on port ' + port);
+app.listen(port, function () {
+    console.log('Server running on port ' + port);
+    console.log('API endpoints available at http://localhost:' + port + '/api');
+});
+
+process.on('SIGINT', function () {
+    mongoose.connection.close(function () {
+        console.log('MongoDB connection closed due to app termination');
+        process.exit(0);
+    });
+});
